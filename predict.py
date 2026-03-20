@@ -5,7 +5,6 @@ def main():
     print("학습된 치과 AI 모델을 불러옵니다.")
     
     # 학습된 최고 성능의 가중치 파일 경로
-    # 만약 저장된 경로가 다르다면 아래 부분을 수정해 주십시오.
     model_path = './runs/detect/train4/weights/best.pt' 
     
     if not os.path.exists(model_path):
@@ -15,7 +14,7 @@ def main():
     # 모델 로드
     model = YOLO(model_path)
     
-    # 테스트할 이미지가 있는 폴더 경로 (Data 폴더 기준)
+    # 테스트할 이미지가 있는 폴더 경로 
     test_source = './Data/test' 
     
     print(f"[{test_source}] 폴더의 이미지들을 분석합니다.")

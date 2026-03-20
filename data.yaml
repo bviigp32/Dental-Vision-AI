@@ -1,12 +1,7 @@
-# data.yaml
-# 학습, 검증, 테스트 데이터셋의 경로 지정 (상대 경로)
 train: ./Data/train
 val: ./Data/valid
 test: ./Data/test
 
 # 클래스(질환) 개수와 이름 지정
-# 주의: 이 부분은 이전 스크립트 실행 후 출력된 '최종 클래스 매핑 결과'에 맞춰 수정해야 합니다.
-# 만약 결과가 {'Caries': 0, 'Normal': 1} 이었다면 아래와 같이 작성합니다.
-
 nc: 4
 names: ['Implant', 'Fillings', 'Impacted Tooth', 'Cavity']

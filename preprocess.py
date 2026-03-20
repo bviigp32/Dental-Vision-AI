@@ -48,7 +48,6 @@ def convert_csv_to_yolo(base_dir):
         
     return classes_map
 
-# archive 폴더가 있는 실제 경로로 지정하여 실행
 base_directory = './Data'
 result_map = convert_csv_to_yolo(base_directory)
 
