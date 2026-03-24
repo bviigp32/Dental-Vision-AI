@@ -4,12 +4,12 @@
 
 ## 프로젝트 개요
 * **목표:** 스마트폰 캡처 및 파노라마 치과 X-ray 사진에서 충치, 임플란트, 매복치 등의 위치를 정확히 탐지하는 객체 탐지(Object Detection) AI 개발 및 서비스화
-* **현재 단계:** Phase 3 - Flutter 기반 프론트엔드 구축 및 백엔드(FastAPI) API 연동 완료 (Web/App 크로스 플랫폼)
+* **현재 단계:** Phase 4 - AI 분석 결과 시각화 (Flutter CustomPaint 기반 Bounding Box 렌더링) 완료
 
 ## 기술 스택
 * **AI Framework:** PyTorch, Ultralytics (YOLOv8)
-* **Backend API:** FastAPI, Uvicorn (CORS Middleware 적용)
-* **Frontend App:** Flutter, Dart (Web/iOS/Android 지원)
+* **Backend API:** FastAPI, Uvicorn
+* **Frontend App:** Flutter, Dart
 * **Hardware Acceleration:** Apple Silicon MPS
 
 ## 디렉토리 구조
@@ -20,28 +20,20 @@
 ├── train.py             # 모델 파인튜닝 스크립트
 ├── main.py              # FastAPI 추론 서버 (CORS 세팅 완료)
 └── dental_app/          # Flutter 크로스 플랫폼 프론트엔드 프로젝트
-    ├── lib/main.dart    # UI 및 HTTP 통신, JSON 파싱 로직
-    └── pubspec.yaml     # 플러터 패키지 관리자 (image_picker, http)
 ```
+
+## 핵심 기능 구현 현황
+* **AI 모델 학습:** 커스텀 치과 데이터셋을 활용한 YOLOv8 객체 탐지 모델 파인튜닝
+* **API 서버:** FastAPI를 이용한 추론 서버 구축 및 파일 업로드 처리
+* **크로스 플랫폼 앱:** 이미지 갤러리 연동 및 HTTP Multipart 통신 구현
+* **결과 시각화:** 원본 이미지와 디바이스 화면 비율을 계산한 정확한 네모 박스 및 신뢰도 라벨 렌더링
 
 ## 실행 방법
-
-### 1. API 서버 구동 (Backend)
-FastAPI 서버를 실행하여 클라이언트의 요청을 대기합니다.
-```bash
-uvicorn main:app --reload
-```
-
-### 2. 클라이언트 앱 실행 (Frontend)
-새로운 터미널에서 `dental_app` 폴더로 이동한 뒤 앱을 실행합니다.
-```bash
-cd dental_app
-flutter run -d chrome  # 웹 브라우저 테스트용
-# 또는 flutter run -d macos  # 데스크톱 앱 테스트용
-```
+1. **API 서버 구동:** `uvicorn main:app --reload`
+2. **앱 실행:** `cd dental_app` 이동 후 `flutter run -d chrome` (웹) 또는 `flutter run -d macos` (데스크톱)
 
 ## 향후 계획 (Next Steps)
-* **Phase 4 (UI 고도화):** JSON으로 전달받은 Bounding Box 좌표를 Flutter의 CustomPaint를 활용하여 실제 업로드한 X-ray 이미지 위에 시각적으로 렌더링
-* **Phase 5 (모바일 최적화):** iOS 시뮬레이터 및 실제 모바일 기기에서의 구동 테스트 및 카메라 직접 촬영 기능 추가
+* **Phase 5 (모바일/기기 최적화):** 실제 스마트폰 카메라 직접 촬영 기능 연동 및 네이티브 권한 설정
 * **Phase 6 (배포):** AWS 또는 GCP를 활용한 백엔드 서버 클라우드 배포
+
 
