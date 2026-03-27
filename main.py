@@ -1,5 +1,6 @@
 # main.py
 from fastapi import FastAPI, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware 
 from ultralytics import YOLO
 from PIL import Image
 import io
@@ -9,6 +10,15 @@ app = FastAPI(
     title="Dental AI Vision API",
     description="치과 X-ray 이미지를 분석하여 질환을 탐지하는 API",
     version="1.0.0"
+)
+
+# --- CORS 설정 부분 ---
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # 모든 출처(포트)에서의 요청을 허용 (로컬 테스트용)
+    allow_credentials=True,
+    allow_methods=["*"], # POST, GET 등 모든 방식 허용
+    allow_headers=["*"],
 )
 
 # 1. 서버 시작 시 AI 모델을 메모리에 로드 (Global)
