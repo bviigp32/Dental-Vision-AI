@@ -71,3 +71,33 @@ async def predict_xray(file: UploadFile = File(...)):
         "disease_count": len(detections),
         "results": detections
     }
+
+from pydantic import BaseModel
+from typing import List, Optional
+
+# ... (기존 모델 로딩 및 /api/predict 코드는 그대로 유지) ...
+
+# 챗봇 요청 데이터 모델 정의
+class ChatRequest(BaseModel):
+    message: str
+    context: Optional[List[dict]] = None
+
+@app.post("/api/chat")
+async def chat_endpoint(request: ChatRequest):
+    user_message = request.message
+    ai_context = request.context
+    
+    # 향후 여기에 OpenAI나 Gemini API 호출 로직이 들어갑니다.
+    # 현재는 프론트엔드에서 데이터가 잘 넘어오는지 확인하기 위한 모의 로직입니다.
+    
+    response_text = ""
+    
+    if ai_context and len(ai_context) > 0:
+        disease_names = [item['disease'] for item in ai_context]
+        response_text = f"현재 엑스레이 분석 결과 {', '.join(disease_names)} 소견이 있습니다. "
+    else:
+        response_text = "현재 분석된 엑스레이 데이터가 없습니다. 일반적인 치과 상담을 진행합니다. "
+        
+    response_text += f"\n환자님의 질문 '{user_message}'에 대한 치과 전문의 수준의 답변을 여기에 생성할 예정입니다."
+    
+    return {"reply": response_text}
