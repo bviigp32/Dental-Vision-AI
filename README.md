@@ -1,38 +1,26 @@
 # Dental Vision AI
 
-> 치과 X-ray 이미지를 분석하여 주요 질환 및 보철물을 자동으로 탐지하는 AI 모델 파이프라인 및 크로스 플랫폼 앱
+> 치과 X-ray 이미지를 분석하여 주요 질환을 탐지하고, 그 결과를 바탕으로 전문적인 상담을 제공하는 AI 앱
 
 ## 프로젝트 개요
-* **목표:** 스마트폰 캡처 및 파노라마 치과 X-ray 사진에서 충치, 임플란트, 매복치 등의 위치를 정확히 탐지하는 객체 탐지(Object Detection) AI 개발 및 서비스화
-* **현재 단계:** Phase 5 - 모바일/기기 최적화 (카메라 네이티브 연동 및 직접 촬영 기능) 완료
+* **목표:** X-ray 객체 탐지(Object Detection) AI와 대규모 언어 모델(LLM)을 결합한 종합 의료 AI 서비스 구축
+* **현재 단계:** Phase 6 - 로컬 프로토타입 완성 (UI 개편 및 Gemini 2.5 Flash 챗봇 연동 완료)
 
 ## 기술 스택
-* **AI Framework:** PyTorch, Ultralytics (YOLOv8)
-* **Backend API:** FastAPI, Uvicorn
-* **Frontend App:** Flutter, Dart
-* **Hardware Acceleration:** Apple Silicon MPS
-
-## 디렉토리 구조
-```text
-├── Data/                # 학습/검증 데이터셋 (Git 제외)
-├── runs/                # 모델 학습 결과물 및 가중치 (Git 제외)
-├── preprocess.py        # 데이터 전처리 스크립트
-├── train.py             # 모델 파인튜닝 스크립트
-├── main.py              # FastAPI 추론 서버 (CORS 세팅 완료)
-└── dental_app/          # Flutter 크로스 플랫폼 프론트엔드 프로젝트
-```
+* **Vision AI:** PyTorch, Ultralytics (YOLOv8)
+* **LLM:** Google Gemini 2.5 Flash, LangChain
+* **Backend:** FastAPI, Uvicorn
+* **Frontend:** Flutter (Web/iOS/Android 호환)
 
 ## 핵심 기능 구현 현황
-* **AI 모델 학습:** 커스텀 치과 데이터셋을 활용한 YOLOv8 객체 탐지 모델 파인튜닝
-* **API 서버:** FastAPI를 이용한 추론 서버 구축 및 파일 업로드 처리
-* **크로스 플랫폼 앱:** **카메라 직접 촬영** 및 이미지 갤러리 연동, HTTP Multipart 통신 구현
-* **결과 시각화:** 원본 이미지와 디바이스 화면 비율을 계산한 정확한 네모 박스 및 신뢰도 라벨 렌더링
+* **AI 비전 분석:** 커스텀 치과 데이터셋으로 학습된 YOLOv8 모델이 질환(충치, 임플란트 등)의 Bounding Box 좌표 반환
+* **크로스 플랫폼 앱:** 카메라 직접 촬영 및 갤러리 연동, 시각화(CustomPaint) 처리 및 모던 UI(Bottom Navigation) 적용
+* **Context-Aware 챗봇:** 비전 AI의 분석 결과를 LLM의 System Prompt로 주입하여, 환자의 현재 상태를 인지하고 대화하는 맞춤형 AI 상담사 구현
 
-## 실행 방법
-1. **API 서버 구동:** `uvicorn main:app --reload`
-2. **앱 실행:** `cd dental_app` 이동 후 `flutter run -d chrome` (웹) 또는 `flutter run -d macos` (데스크톱)
+## 실행 방법 (Local)
+1. **API 서버 구동:** `uvicorn main:app --reload` (루트 디렉토리)
+2. **앱 실행:** `cd dental_app` 이동 후 `flutter run -d chrome`
 
 ## 향후 계획 (Next Steps)
-* **Phase 6 (클라우드 배포):** 외부에서도 앱이 작동할 수 있도록 AI 백엔드 서버(FastAPI)를 클라우드 환경에 배포
-* **Phase 7 (운영 고도화):** 사용자 피드백을 수집하여 AI 모델을 재학습시키는 MLOps 파이프라인 구상
-```
+* **Phase 6 (클라우드 배포):** 외부 환경에서도 앱이 작동할 수 있도록 AI 백엔드 서버를 클라우드 환경에 배포
+
