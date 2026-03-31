@@ -4,6 +4,8 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
+// 스트리밍 통신을 위해 dio 패키지 임포트
+import 'package:dio/dio.dart';
 
 void main() {
   runApp(const DentalApp());
@@ -290,7 +292,7 @@ class BoundingBoxPainter extends CustomPainter {
 }
 
 // ---------------------------------------------------------
-// 두 번째 탭: 치과 챗봇 화면 (UI/UX 개선)
+// 두 번째 탭: 치과 챗봇 화면 (스트리밍 완벽 구현)
 // ---------------------------------------------------------
 class ChatbotScreen extends StatefulWidget {
   final List<dynamic> aiResults;
@@ -302,63 +304,105 @@ class ChatbotScreen extends StatefulWidget {
 
 class _ChatbotScreenState extends State<ChatbotScreen> {
   final TextEditingController _controller = TextEditingController();
-  // 스크롤 제어를 위한 컨트롤러 추가
   final ScrollController _scrollController = ScrollController();
   final List<Map<String, String>> _messages = [];
   bool _isTyping = false;
+  
+  // 스트리밍 전송을 담당할 Dio 클라이언트 초기화
+  final Dio _dio = Dio();
 
-  // 화면 맨 아래로 부드럽게 스크롤하는 함수
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
+          duration: const Duration(milliseconds: 200),
           curve: Curves.easeOut,
         );
       }
     });
   }
 
+  // 실시간 챗봇 전송 함수 (고난도 로직)
   Future<void> _sendMessage() async {
     if (_controller.text.trim().isEmpty) return;
 
     String userMessage = _controller.text;
+    
     setState(() {
+      // 1. 유저 말풍선 추가
       _messages.add({"sender": "user", "text": userMessage});
+      // 2. 중요! 껍데기만 있는 빈 AI 말풍선 미리 생성
+      _messages.add({"sender": "ai", "text": ""});
       _isTyping = true;
     });
     
+    final aiMessageIndex = _messages.length - 1; // 빈 AI 말풍선의 위치 기억
     _controller.clear();
-    _scrollToBottom(); // 내 메시지를 보내면 즉시 아래로 스크롤
+    _scrollToBottom();
 
     try {
-      var uri = Uri.parse('http://127.0.0.1:8000/api/chat');
-      var response = await http.post(
-        uri,
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({"message": userMessage, "context": widget.aiResults}),
+      // 디오를 사용하여 스트리밍 데이터를 받기 위해 responseType을 stream으로 설정합니다.
+      final response = await _dio.post(
+        'http://127.0.0.1:8000/api/chat-stream',
+        data: {"message": userMessage, "context": widget.aiResults},
+        options: Options(responseType: ResponseType.stream), // 가장 핵심적인 설정
       );
 
-      if (response.statusCode == 200) {
-        var jsonResponse = jsonDecode(utf8.decode(response.bodyBytes));
-        setState(() {
-          _messages.add({"sender": "ai", "text": jsonResponse["reply"]});
-        });
-      } else {
-        setState(() {
-          _messages.add({"sender": "ai", "text": "서버 통신 오류가 발생했습니다."});
-        });
+      // 서버로부터 도착하는 바이트 스트림 데이터(ResponseBody)를 비동기로 읽어옵니다.
+      final stream = response.data.stream;
+      String accumulatedData = ""; // 네트워크 지연으로 쪼개져 들어온 SSE 데이터를 하나로 뭉치기 위한 변수
+
+      await for (final chunk in stream) {
+        // 도착한 바이트 데이터를 문자열로 디코딩
+        final text = utf8.decode(chunk);
+        accumulatedData += text; // 기존 데이터에 덧붙임
+
+        // SSE 표준 형식인 '\n\n' (더블 엔터)를 기준으로 개별 data 메시지를 파싱합니다.
+        int sseEventIndex = accumulatedData.indexOf('\n\n');
+        
+        // 네트워크에서 한 줄이 완전히 도착했을 때만 파싱을 시작
+        while (sseEventIndex != -1) {
+          final eventString = accumulatedData.substring(0, sseEventIndex); // 하나의 개별data 전체 ("data: {...}")
+          accumulatedData = accumulatedData.substring(sseEventIndex + 2); // 처리한 부분 제거
+
+          // "data: "로 시작하는 경우에만 안쪽의 진짜 데이터를 추출
+          if (eventString.startsWith('data: ')) {
+            final jsonStr = eventString.substring(6); // JSON 파싱을 위해 "data: " 뒷부분만 잘라냄
+            
+            try {
+              final chunkData = jsonDecode(jsonStr); // JSON 파싱
+              
+              // AI가 보낸 진짜 텍스트 조각 {"text": "충"}
+              final String contentText = chunkData['text'] ?? "";
+              
+              if (contentText.isNotEmpty && mounted) {
+                // 플러터 UI 업데이트: 미리 만들어둔 빈 AI 말풍선에 텍스트 조각을 '실시간으로' 덧붙임!
+                setState(() {
+                  _messages[aiMessageIndex]["text"] = _messages[aiMessageIndex]["text"]! + contentText;
+                });
+                _scrollToBottom(); // 글자가 추가될 때마다 자동으로 스크롤
+              }
+            } catch (e) {
+              // 가끔 완료 신호나 메타데이터가 올 때 JSON 파싱 에러가 날 수 있으므로 가볍게 무시
+              print("SSE 데이터 디코딩 에러 (정상): $e");
+            }
+          }
+          // 남은 accumulatedData 안에서 다음 더블 엔터('\n\n') 위치 탐색
+          sseEventIndex = accumulatedData.indexOf('\n\n');
+        }
       }
     } catch (e) {
-      setState(() {
-        _messages.add({"sender": "ai", "text": "네트워크 오류가 발생했습니다."});
-      });
+      if (mounted) {
+        setState(() {
+          _messages[aiMessageIndex]["text"] = "네트워크 오류가 발생했습니다.\n에러: ${e.toString()}";
+        });
+      }
     } finally {
-      setState(() {
-        _isTyping = false;
-      });
-      _scrollToBottom(); // AI 답변이 오면 다시 아래로 스크롤
+      if (mounted) {
+        setState(() => _isTyping = false);
+      }
+      _scrollToBottom();
     }
   }
 
@@ -382,7 +426,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
             
           Expanded(
             child: ListView.builder(
-              controller: _scrollController, // 스크롤 컨트롤러 연결
+              controller: _scrollController,
               padding: const EdgeInsets.all(16),
               itemCount: _messages.length,
               itemBuilder: (context, index) {
@@ -410,29 +454,15 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
             ),
           ),
           
-          // AI가 타이핑 중일 때 보여줄 로딩 말풍선 UI
+          // 답변 작성 중... 말풍선 대신, 글자가 실시간으로 쳐지므로 로딩 애니메이션은 입력창 윗부분에 살짝 표시
           if (_isTyping)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
               child: Align(
                 alignment: Alignment.centerLeft,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[200],
-                    borderRadius: BorderRadius.circular(16).copyWith(bottomLeft: const Radius.circular(0)),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox(
-                        width: 15, height: 15,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.teal),
-                      ),
-                      SizedBox(width: 10),
-                      Text("답변을 작성하고 있습니다...", style: TextStyle(color: Colors.black54, fontSize: 13)),
-                    ],
-                  ),
+                child: SizedBox(
+                  width: 12, height: 12,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.teal),
                 ),
               ),
             ),
@@ -448,7 +478,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                 Expanded(
                   child: TextField(
                     controller: _controller,
-                    // 로딩 중일 때는 입력창 비활성화
+                    // 스트리밍 답변 도중에는 새로운 질문 입력 방지
                     enabled: !_isTyping,
                     decoration: const InputDecoration(
                       hintText: "궁금한 점을 물어보세요...",
@@ -460,7 +490,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                 ),
                 IconButton(
                   icon: const Icon(Icons.send, color: Colors.teal),
-                  // 로딩 중일 때는 전송 버튼 비활성화
+                  // 스트리밍 답변 도중에는 전송 버튼 비활성화
                   onPressed: _isTyping ? null : _sendMessage,
                 ),
               ],

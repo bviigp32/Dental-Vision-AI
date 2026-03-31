@@ -1,8 +1,10 @@
 import os
 import io
 import json
+import asyncio # 비동기 처리를 위해 추가
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse # 스트리밍 응답을 위해 추가
 from pydantic import BaseModel
 from typing import List, Optional
 from ultralytics import YOLO
@@ -12,13 +14,13 @@ from dotenv import load_dotenv
 # 1. 환경 변수 로드
 load_dotenv()
 
-# 2. DocuMind에서 사용했던 LangChain 패키지 임포트
+# DocuMind 프로젝트 패키지
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage, HumanMessage
 
 app = FastAPI(
     title="Dental AI Vision API",
-    description="치과 X-ray 분석 및 Gemini AI 챗봇 API (LangChain)",
+    description="치과 X-ray 분석 및 Gemini AI 스트리밍 챗봇 API (LangChain)",
     version="1.0.0"
 )
 
@@ -66,29 +68,40 @@ async def predict_xray(file: UploadFile = File(...)):
     }
 
 # ---------------------------------------------------------
-# Gemini 챗봇 연동 API (LangChain 방식)
+# Gemini 챗봇 스트리밍 API (SSE 구현)
 # ---------------------------------------------------------
 class ChatRequest(BaseModel):
     message: str
     context: Optional[List[dict]] = None
 
-@app.post("/api/chat")
-async def chat_endpoint(request: ChatRequest):
+# 🚀 챗봇이 생성하는 답변 토큰을 하나씩 SSE 형식으로 포맷팅하여 프론트엔드로 흘려보내는 제너레이터 함수
+async def generate_chat_stream(llm, messages):
+    # ainvoke 대신 랭체인의 astream을 사용합니다.
+    async for chunk in llm.astream(messages):
+        content = chunk.content
+        if content:
+            # SSE 표준 형식: "data: <데이터내용>\n\n"
+            # 프론트엔드에서 파싱하기 쉽도록 JSON 문자열로 감싸서 보냅니다.
+            # {"text": "충"}
+            data = json.dumps({"text": content})
+            yield f"data: {data}\n\n"
+            # 네트워크가 너무 빠르면 스트리밍 효과가 안 보일 수 있으므로 로컬 테스트 시 아주 미세한 딜레이를 줍니다.
+            await asyncio.sleep(0.01) 
+
+@app.post("/api/chat-stream") # 엔드포인트 이름을 직관적으로 변경
+async def chat_stream_endpoint(request: ChatRequest):
     user_message = request.message
     ai_context = request.context
     
     context_str = "현재 분석된 엑스레이 데이터가 없습니다. 일반적인 치과 상담을 진행합니다."
-    
     if ai_context and len(ai_context) > 0:
         disease_counts = {}
         for item in ai_context:
             disease = item['disease']
             disease_counts[disease] = disease_counts.get(disease, 0) + 1
-        
         context_parts = []
         for disease, count in disease_counts.items():
             context_parts.append(f"{disease} {count}개")
-            
         context_str = f"환자의 엑스레이 분석 결과, 현재 {', '.join(context_parts)}가 발견되었습니다."
 
     system_prompt = f"""당신은 10년 차 경력의 친절하고 전문적인 AI 치과 의사입니다. 
@@ -105,7 +118,7 @@ async def chat_endpoint(request: ChatRequest):
 """
 
     try:
-        # 3. DocuMind에서 성공했던 gemini-2.5-flash 모델 호출
+        # LLM 초기화 (DocuMind 방식 그대로 gemini-2.5-flash)
         llm = ChatGoogleGenerativeAI(
             model="gemini-2.5-flash",
             temperature=0.7
@@ -116,10 +129,16 @@ async def chat_endpoint(request: ChatRequest):
             HumanMessage(content=user_message)
         ]
         
-        # 비동기(ainvoke)로 답변 생성
-        response = await llm.ainvoke(messages)
-        
-        return {"reply": response.content}
+        # JSON 대신 StreamingResponse를 반환합니다. 제너레이터 함수를 연결하고 미디어 타입을 설정합니다.
+        return StreamingResponse(
+            generate_chat_stream(llm, messages),
+            media_type="text/event-stream" # SSE 표준 미디어 타입
+        )
         
     except Exception as e:
-        return {"reply": f"Gemini API 통신 중 문제가 발생했습니다: {str(e)}"}
+        # 스트리밍 도중 오류 발생 시 프론트엔드로 에러 메시지를 SSE 형식으로 전송
+        error_data = json.dumps({"error": str(e)})
+        return StreamingResponse(
+            (item for item in [f"data: {error_data}\n\n"]),
+            media_type="text/event-stream"
+        )
