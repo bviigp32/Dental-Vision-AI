@@ -76,17 +76,17 @@ class ChatRequest(BaseModel):
 
 # 챗봇이 생성하는 답변 토큰을 하나씩 SSE 형식으로 포맷팅하여 프론트엔드로 흘려보내는 제너레이터 함수
 async def generate_chat_stream(llm, messages):
+    # ainvoke 대신 랭체인의 astream을 사용합니다.
     async for chunk in llm.astream(messages):
         content = chunk.content
         if content:
-            # Gemini가 준 뭉텅이 데이터를 한 글자(char)씩 강제로 쪼갭니다.
-            for char in content:
-                data = json.dumps({"text": char}, ensure_ascii=False)
-                yield f"data: {data}\n\n"
-                
-                # 타자 치는 속도를 결정하는 딜레이 (0.02초 = 20ms)
-                # 이 값이 커질수록 타자 치는 속도가 느려집니다.
-                await asyncio.sleep(0.02)
+            # SSE 표준 형식: "data: <데이터내용>\n\n"
+            # 프론트엔드에서 파싱하기 쉽도록 JSON 문자열로 감싸서 보냅니다.
+            # {"text": "충"}
+            data = json.dumps({"text": content})
+            yield f"data: {data}\n\n"
+            # 네트워크가 너무 빠르면 스트리밍 효과가 안 보일 수 있으므로 로컬 테스트 시 아주 미세한 딜레이를 줍니다.
+            await asyncio.sleep(0.01) 
 
 @app.post("/api/chat-stream") # 엔드포인트 이름을 직관적으로 변경
 async def chat_stream_endpoint(request: ChatRequest):
