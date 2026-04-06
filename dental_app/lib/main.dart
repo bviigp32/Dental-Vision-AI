@@ -4,8 +4,8 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
-// 스트리밍 통신을 위해 dio 패키지 임포트
 import 'package:dio/dio.dart';
+import 'package:video_player/video_player.dart';
 
 void main() {
   runApp(const DentalApp());
@@ -33,6 +33,9 @@ class DentalApp extends StatelessWidget {
   }
 }
 
+// ---------------------------------------------------------
+// 실수로 지워졌던 MainNavigator 클래스 복구!
+// ---------------------------------------------------------
 class MainNavigator extends StatefulWidget {
   const MainNavigator({super.key});
 
@@ -52,9 +55,11 @@ class _MainNavigatorState extends State<MainNavigator> {
 
   @override
   Widget build(BuildContext context) {
+    // 🚀 화면 3개로 구성
     final List<Widget> screens = [
       VisionScreen(onResultsUpdated: _updateAiResults),
       ChatbotScreen(aiResults: _globalAiResults),
+      const VideoScreen(), // 3번째 영상 탭
     ];
 
     return Scaffold(
@@ -77,6 +82,11 @@ class _MainNavigatorState extends State<MainNavigator> {
             selectedIcon: Icon(Icons.chat_bubble),
             label: '치과 AI 상담',
           ),
+          NavigationDestination(
+            icon: Icon(Icons.ondemand_video_outlined),
+            selectedIcon: Icon(Icons.ondemand_video),
+            label: '치아 관리 영상',
+          ),
         ],
       ),
     );
@@ -84,7 +94,7 @@ class _MainNavigatorState extends State<MainNavigator> {
 }
 
 // ---------------------------------------------------------
-// 첫 번째 탭: X-ray 정밀 분석 화면 (기존과 동일)
+// 첫 번째 탭: X-ray 정밀 분석 화면
 // ---------------------------------------------------------
 class VisionScreen extends StatefulWidget {
   final Function(List<dynamic>) onResultsUpdated;
@@ -292,7 +302,7 @@ class BoundingBoxPainter extends CustomPainter {
 }
 
 // ---------------------------------------------------------
-// 두 번째 탭: 치과 챗봇 화면 (스트리밍 완벽 구현)
+// 두 번째 탭: 치과 챗봇 화면 (스트리밍 구현)
 // ---------------------------------------------------------
 class ChatbotScreen extends StatefulWidget {
   final List<dynamic> aiResults;
@@ -307,8 +317,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   final ScrollController _scrollController = ScrollController();
   final List<Map<String, String>> _messages = [];
   bool _isTyping = false;
-  
-  // 스트리밍 전송을 담당할 Dio 클라이언트 초기화
   final Dio _dio = Dio();
 
   void _scrollToBottom() {
@@ -323,72 +331,58 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     });
   }
 
-  // 실시간 챗봇 전송 함수 (고난도 로직)
   Future<void> _sendMessage() async {
     if (_controller.text.trim().isEmpty) return;
 
     String userMessage = _controller.text;
     
     setState(() {
-      // 1. 유저 말풍선 추가
       _messages.add({"sender": "user", "text": userMessage});
-      // 2. 중요! 껍데기만 있는 빈 AI 말풍선 미리 생성
       _messages.add({"sender": "ai", "text": ""});
       _isTyping = true;
     });
     
-    final aiMessageIndex = _messages.length - 1; // 빈 AI 말풍선의 위치 기억
+    final aiMessageIndex = _messages.length - 1; 
     _controller.clear();
     _scrollToBottom();
 
     try {
-      // 디오를 사용하여 스트리밍 데이터를 받기 위해 responseType을 stream으로 설정합니다.
       final response = await _dio.post(
         'http://127.0.0.1:8000/api/chat-stream',
         data: {"message": userMessage, "context": widget.aiResults},
-        options: Options(responseType: ResponseType.stream), // 가장 핵심적인 설정
+        options: Options(responseType: ResponseType.stream), 
       );
 
-      // 서버로부터 도착하는 바이트 스트림 데이터(ResponseBody)를 비동기로 읽어옵니다.
       final stream = response.data.stream;
-      String accumulatedData = ""; // 네트워크 지연으로 쪼개져 들어온 SSE 데이터를 하나로 뭉치기 위한 변수
+      String accumulatedData = ""; 
 
       await for (final chunk in stream) {
-        // 도착한 바이트 데이터를 문자열로 디코딩
         final text = utf8.decode(chunk);
-        accumulatedData += text; // 기존 데이터에 덧붙임
+        accumulatedData += text; 
 
-        // SSE 표준 형식인 '\n\n' (더블 엔터)를 기준으로 개별 data 메시지를 파싱합니다.
         int sseEventIndex = accumulatedData.indexOf('\n\n');
         
-        // 네트워크에서 한 줄이 완전히 도착했을 때만 파싱을 시작
         while (sseEventIndex != -1) {
-          final eventString = accumulatedData.substring(0, sseEventIndex); // 하나의 개별data 전체 ("data: {...}")
-          accumulatedData = accumulatedData.substring(sseEventIndex + 2); // 처리한 부분 제거
+          final eventString = accumulatedData.substring(0, sseEventIndex); 
+          accumulatedData = accumulatedData.substring(sseEventIndex + 2); 
 
-          // "data: "로 시작하는 경우에만 안쪽의 진짜 데이터를 추출
           if (eventString.startsWith('data: ')) {
-            final jsonStr = eventString.substring(6); // JSON 파싱을 위해 "data: " 뒷부분만 잘라냄
+            final jsonStr = eventString.substring(6); 
             
             try {
-              final chunkData = jsonDecode(jsonStr); // JSON 파싱
-              
-              // AI가 보낸 진짜 텍스트 조각 {"text": "충"}
+              final chunkData = jsonDecode(jsonStr); 
               final String contentText = chunkData['text'] ?? "";
               
               if (contentText.isNotEmpty && mounted) {
-                // 플러터 UI 업데이트: 미리 만들어둔 빈 AI 말풍선에 텍스트 조각을 '실시간으로' 덧붙임!
                 setState(() {
                   _messages[aiMessageIndex]["text"] = _messages[aiMessageIndex]["text"]! + contentText;
                 });
-                _scrollToBottom(); // 글자가 추가될 때마다 자동으로 스크롤
+                _scrollToBottom(); 
               }
             } catch (e) {
-              // 가끔 완료 신호나 메타데이터가 올 때 JSON 파싱 에러가 날 수 있으므로 가볍게 무시
               print("SSE 데이터 디코딩 에러 (정상): $e");
             }
           }
-          // 남은 accumulatedData 안에서 다음 더블 엔터('\n\n') 위치 탐색
           sseEventIndex = accumulatedData.indexOf('\n\n');
         }
       }
@@ -454,7 +448,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
             ),
           ),
           
-          // 답변 작성 중... 말풍선 대신, 글자가 실시간으로 쳐지므로 로딩 애니메이션은 입력창 윗부분에 살짝 표시
           if (_isTyping)
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
@@ -478,7 +471,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                 Expanded(
                   child: TextField(
                     controller: _controller,
-                    // 스트리밍 답변 도중에는 새로운 질문 입력 방지
                     enabled: !_isTyping,
                     decoration: const InputDecoration(
                       hintText: "궁금한 점을 물어보세요...",
@@ -490,13 +482,89 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                 ),
                 IconButton(
                   icon: const Icon(Icons.send, color: Colors.teal),
-                  // 스트리밍 답변 도중에는 전송 버튼 비활성화
                   onPressed: _isTyping ? null : _sendMessage,
                 ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------
+// 세 번째 탭: 치아 관리 영상 탭
+// ---------------------------------------------------------
+class VideoScreen extends StatefulWidget {
+  const VideoScreen({super.key});
+
+  @override
+  State<VideoScreen> createState() => _VideoScreenState();
+}
+
+class _VideoScreenState extends State<VideoScreen> {
+  late VideoPlayerController _controller;
+  bool _isInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.networkUrl(
+      Uri.parse('https://flutter.github.io/assets-for-api-docs/assets/videos/butterfly.mp4'),
+    )..initialize().then((_) {
+        setState(() {
+          _isInitialized = true;
+        });
+      });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('올바른 치아 관리법')),
+      body: Center(
+        child: _isInitialized
+            ? Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  AspectRatio(
+                    aspectRatio: _controller.value.aspectRatio,
+                    child: VideoPlayer(_controller),
+                  ),
+                  const SizedBox(height: 20),
+                  FloatingActionButton(
+                    onPressed: () {
+                      setState(() {
+                        _controller.value.isPlaying
+                            ? _controller.pause()
+                            : _controller.play();
+                      });
+                    },
+                    backgroundColor: Colors.teal,
+                    child: Icon(
+                      _controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: Text(
+                      "위 영상은 샘플입니다.\n나중에는 '올바른 양치질 방법', '임플란트 사후 관리' 같은 유용한 치과 영상을 이곳에 연결할 수 있습니다.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.black54),
+                    ),
+                  )
+                ],
+              )
+            : const CircularProgressIndicator(color: Colors.teal),
       ),
     );
   }
