@@ -33,9 +33,6 @@ class DentalApp extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------
-// 실수로 지워졌던 MainNavigator 클래스 복구!
-// ---------------------------------------------------------
 class MainNavigator extends StatefulWidget {
   const MainNavigator({super.key});
 
@@ -55,15 +52,17 @@ class _MainNavigatorState extends State<MainNavigator> {
 
   @override
   Widget build(BuildContext context) {
-    // 🚀 화면 3개로 구성
     final List<Widget> screens = [
       VisionScreen(onResultsUpdated: _updateAiResults),
       ChatbotScreen(aiResults: _globalAiResults),
-      const VideoScreen(), // 3번째 영상 탭
+      const VideoScreen(), 
     ];
 
     return Scaffold(
-      body: screens[_currentIndex],
+      body: IndexedStack(
+        index: _currentIndex,
+        children: screens,
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) {
