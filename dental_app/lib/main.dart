@@ -55,7 +55,7 @@ class _MainNavigatorState extends State<MainNavigator> {
     final List<Widget> screens = [
       VisionScreen(onResultsUpdated: _updateAiResults),
       ChatbotScreen(aiResults: _globalAiResults),
-      const VideoScreen(), 
+      VideoScreen(aiResults: _globalAiResults), // 여기에 넘겨줍니다!
     ];
 
     return Scaffold(
@@ -493,25 +493,92 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
 }
 
 // ---------------------------------------------------------
-// 세 번째 탭: 치아 관리 영상 탭
+// 세 번째 탭: 맞춤형 치아 관리 영상 탭 (업그레이드 완료!)
 // ---------------------------------------------------------
 class VideoScreen extends StatefulWidget {
-  const VideoScreen({super.key});
+  final List<dynamic> aiResults; // 🚀 AI 결과를 받아옵니다.
+  
+  const VideoScreen({super.key, required this.aiResults});
 
   @override
   State<VideoScreen> createState() => _VideoScreenState();
 }
 
 class _VideoScreenState extends State<VideoScreen> {
-  late VideoPlayerController _controller;
+  VideoPlayerController? _controller;
   bool _isInitialized = false;
+  
+  // 현재 재생 중인 영상의 제목과 설명
+  String _videoTitle = "일반 치아 관리법";
+  String _videoDescription = "건강한 치아를 유지하기 위한 기본적인 관리 방법을 소개합니다.";
+
+  // 질환별 맞춤 영상 데이터베이스 (샘플 URL 사용)
+  // 실제 서비스 시 질환별 알맞은 영상 URL로 교체하시면 됩니다.
+  final Map<String, Map<String, String>> _videoDatabase = {
+    'Cavity': {
+      'url': 'https://flutter.github.io/assets-for-api-docs/assets/videos/butterfly.mp4', // 충치 영상 URL (샘플)
+      'title': "올바른 양치질과 충치 예방법",
+      'desc': "분석 결과 충치가 의심됩니다. 충치 진행을 막기 위한 양치법과 관리법을 꼭 확인하세요."
+    },
+    'Implant': {
+      'url': 'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4', // 임플란트 영상 URL (샘플)
+      'title': "임플란트 사후 관리 가이드",
+      'desc': "임플란트는 시술 후 관리가 매우 중요합니다. 오래 사용하는 관리 비법을 영상으로 만나보세요."
+    },
+    'Impacted Tooth': {
+       'url': 'https://flutter.github.io/assets-for-api-docs/assets/videos/butterfly.mp4', // 매복치 영상 URL (샘플)
+      'title': "매복치/사랑니 발치 후 주의사항",
+      'desc': "발치 후 통증과 붓기를 줄이고 빠른 회복을 돕는 주의사항 안내 영상입니다."
+    },
+    'default': {
+      'url': 'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4', // 기본 영상 URL (샘플)
+      'title': "매일매일 실천하는 치과 상식",
+      'desc': "분석된 특이 질환이 없더라도, 꾸준한 관리가 건강한 치아를 만듭니다."
+    }
+  };
 
   @override
   void initState() {
     super.initState();
-    _controller = VideoPlayerController.networkUrl(
-      Uri.parse('https://flutter.github.io/assets-for-api-docs/assets/videos/butterfly.mp4'),
-    )..initialize().then((_) {
+    _loadVideoBasedOnResults();
+  }
+
+  // 🚀 AI 분석 결과(위젯이 업데이트 될 때)가 바뀌면 영상을 새로 세팅합니다.
+  @override
+  void didUpdateWidget(covariant VideoScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.aiResults != oldWidget.aiResults) {
+      _loadVideoBasedOnResults();
+    }
+  }
+
+  // 🚀 핵심 로직: 질환에 맞는 영상을 찾아 로드합니다.
+  void _loadVideoBasedOnResults() {
+    String selectedDisease = 'default';
+
+    // 분석 결과가 있다면, 가장 먼저 탐지된 질환(또는 우선순위)의 영상을 선택합니다.
+    if (widget.aiResults.isNotEmpty) {
+      // 여기서는 심플하게 첫 번째로 탐지된 질환을 기준으로 합니다.
+      String firstDetected = widget.aiResults.first['disease'];
+      
+      if (_videoDatabase.containsKey(firstDetected)) {
+         selectedDisease = firstDetected;
+      }
+    }
+
+    final videoInfo = _videoDatabase[selectedDisease]!;
+    
+    // 기존 컨트롤러가 있다면 해제하고 새로 만듭니다.
+    _controller?.dispose();
+    
+    setState(() {
+      _isInitialized = false;
+      _videoTitle = videoInfo['title']!;
+      _videoDescription = videoInfo['desc']!;
+    });
+
+    _controller = VideoPlayerController.networkUrl(Uri.parse(videoInfo['url']!))
+      ..initialize().then((_) {
         setState(() {
           _isInitialized = true;
         });
@@ -520,45 +587,66 @@ class _VideoScreenState extends State<VideoScreen> {
 
   @override
   void dispose() {
-    _controller.dispose();
+    _controller?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('올바른 치아 관리법')),
+      appBar: AppBar(title: const Text('맞춤형 예방 및 관리 가이드')),
       body: Center(
-        child: _isInitialized
+        child: _isInitialized && _controller != null
             ? Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
+                  // 🚀 맞춤형 제목 표시
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                    child: Text(
+                      _videoTitle,
+                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.teal),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  
+                  // 영상 플레이어
                   AspectRatio(
-                    aspectRatio: _controller.value.aspectRatio,
-                    child: VideoPlayer(_controller),
+                    aspectRatio: _controller!.value.aspectRatio,
+                    child: VideoPlayer(_controller!),
                   ),
                   const SizedBox(height: 20),
+                  
+                  // 재생 / 일시정지 버튼
                   FloatingActionButton(
                     onPressed: () {
                       setState(() {
-                        _controller.value.isPlaying
-                            ? _controller.pause()
-                            : _controller.play();
+                        _controller!.value.isPlaying
+                            ? _controller!.pause()
+                            : _controller!.play();
                       });
                     },
                     backgroundColor: Colors.teal,
                     child: Icon(
-                      _controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
+                      _controller!.value.isPlaying ? Icons.pause : Icons.play_arrow,
                       color: Colors.white,
                     ),
                   ),
                   const SizedBox(height: 20),
-                  const Padding(
-                    padding: EdgeInsets.all(16.0),
+                  
+                  // 🚀 맞춤형 설명 텍스트 표시
+                  Container(
+                    padding: const EdgeInsets.all(16.0),
+                    margin: const EdgeInsets.symmetric(horizontal: 20),
+                    decoration: BoxDecoration(
+                      color: Colors.teal.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     child: Text(
-                      "위 영상은 샘플입니다.\n나중에는 '올바른 양치질 방법', '임플란트 사후 관리' 같은 유용한 치과 영상을 이곳에 연결할 수 있습니다.",
+                      _videoDescription,
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.black54),
+                      style: const TextStyle(color: Colors.black87, fontSize: 15, height: 1.5),
                     ),
                   )
                 ],
