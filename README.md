@@ -25,7 +25,6 @@
 
 ### Infra & Frontend
 ![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white) ![Kubernetes](https://img.shields.io/badge/Kubernetes-326CE5?style=flat-square&logo=kubernetes&logoColor=white) ![Elasticsearch](https://img.shields.io/badge/Elasticsearch-005571?style=flat-square&logo=elasticsearch&logoColor=white)
-![Flutter](https://img.shields.io/badge/Flutter-02569B?style=flat-square&logo=flutter&logoColor=white)
 
 <br>
 
@@ -40,7 +39,8 @@
 * **SSE 기반 실시간 답변 스트리밍:** 생성형 AI의 가장 큰 문제인 '긴 응답 대기 시간'을 극복하기 위해, **Server-Sent Events(SSE)** 프로토콜을 도입하여 서버에서 생성되는 토큰을 한 글자씩 프론트엔드로 스트리밍합니다. 이를 통해 **초기 응답 지연을 약 80% 이상 감소**시켰습니다.
 
 ### 3. 치아 관리 가이드 (Video Education)
-* **의료 경험의 확장:** 진단과 상담을 넘어 사후 관리까지 책임질 수 있도록 네이티브 비디오 플레이어를 연동하여, 올바른 치아 관리 및 예방 영상을 시청할 수 있는 멀티미디어 환경을 구축했습니다.
+* **다중 질환 맞춤형 영상 매칭:** 한 번의 분석으로 여러 질환(예: 충치, 매복치 등)이 탐지되더라도, 각각의 질환에 맞는 교육 영상을 중복 없이 리스트 형태로 자동 큐레이션하여 제공합니다.
+* **YouTube Iframe 연동:** `Youtubeer_iframe` 패키지를 도입하여, 앱 내에서 네이티브하게 유튜브 영상을 재생하고 독립적으로 제어할 수 있는 안정적인 멀티미디어 환경을 구축했습니다.
 
 ### 4. 무결점 사용자 경험 (State Preservation UX)
 * **IndexedStack 기반 상태 유지:** 탭 이동 시 위젯 트리가 파괴되는 플러터의 기본 동작을 제어하기 위해 `IndexedStack`을 도입했습니다. 이를 통해 무거운 비전 분석 결과와 챗봇 대화 기록이 탭 전환 중에도 메모리 상에 안전하게 유지되어 끊김 없는 사용자 경험을 제공합니다.

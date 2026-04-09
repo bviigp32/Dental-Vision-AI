@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:dio/dio.dart';
+import 'package:youtube_player_iframe/youtube_player_iframe.dart'; 
 import 'package:video_player/video_player.dart';
 
 void main() {
@@ -493,10 +494,10 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
 }
 
 // ---------------------------------------------------------
-// 세 번째 탭: 맞춤형 치아 관리 영상 탭 (업그레이드 완료!)
+// 세 번째 탭: 맞춤형 치아 관리 영상 탭 
 // ---------------------------------------------------------
 class VideoScreen extends StatefulWidget {
-  final List<dynamic> aiResults; // 🚀 AI 결과를 받아옵니다.
+  final List<dynamic> aiResults;
   
   const VideoScreen({super.key, required this.aiResults});
 
@@ -505,79 +506,95 @@ class VideoScreen extends StatefulWidget {
 }
 
 class _VideoScreenState extends State<VideoScreen> {
-  VideoPlayerController? _controller;
-  bool _isInitialized = false;
-  
-  // 현재 재생 중인 영상의 제목과 설명
-  String _videoTitle = "일반 치아 관리법";
-  String _videoDescription = "건강한 치아를 유지하기 위한 기본적인 관리 방법을 소개합니다.";
-
-  // 질환별 맞춤 영상 데이터베이스 (샘플 URL 사용)
-  // 실제 서비스 시 질환별 알맞은 영상 URL로 교체하시면 됩니다.
   final Map<String, Map<String, String>> _videoDatabase = {
     'Cavity': {
-      'url': 'https://flutter.github.io/assets-for-api-docs/assets/videos/butterfly.mp4', // 충치 영상 URL (샘플)
+      'assetPath': 'assets/videos/cavity.mp4', 
       'title': "올바른 양치질과 충치 예방법",
-      'desc': "분석 결과 충치가 의심됩니다. 충치 진행을 막기 위한 양치법과 관리법을 꼭 확인하세요."
+      'desc': "충치 진행을 막기 위한 양치법과 관리법을 확인하세요."
     },
     'Implant': {
-      'url': 'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4', // 임플란트 영상 URL (샘플)
+      'assetPath': 'assets/videos/implant.mp4', 
       'title': "임플란트 사후 관리 가이드",
-      'desc': "임플란트는 시술 후 관리가 매우 중요합니다. 오래 사용하는 관리 비법을 영상으로 만나보세요."
+      'desc': "오래 사용하는 임플란트 관리 비법을 영상으로 만나보세요."
     },
     'Impacted Tooth': {
-       'url': 'https://flutter.github.io/assets-for-api-docs/assets/videos/butterfly.mp4', // 매복치 영상 URL (샘플)
+      'assetPath': 'assets/videos/impacted.mp4',
       'title': "매복치/사랑니 발치 후 주의사항",
-      'desc': "발치 후 통증과 붓기를 줄이고 빠른 회복을 돕는 주의사항 안내 영상입니다."
+      'desc': "발치 후 통증과 붓기를 줄이고 빠른 회복을 돕는 주의사항입니다."
     },
     'default': {
-      'url': 'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4', // 기본 영상 URL (샘플)
+      'assetPath': 'assets/videos/default.mp4', 
       'title': "매일매일 실천하는 치과 상식",
-      'desc': "분석된 특이 질환이 없더라도, 꾸준한 관리가 건강한 치아를 만듭니다."
+      'desc': "꾸준한 관리가 건강한 치아를 만듭니다."
     }
   };
+
+  List<Map<String, String>> _getVideosToShow() {
+    List<Map<String, String>> videos = [];
+    if (widget.aiResults.isEmpty) {
+      videos.add(_videoDatabase['default']!);
+      return videos;
+    }
+    Set<String> uniqueDiseases = widget.aiResults.map((e) => e['disease'].toString()).toSet();
+    for (var disease in uniqueDiseases) {
+      if (_videoDatabase.containsKey(disease)) {
+        videos.add(_videoDatabase[disease]!);
+      }
+    }
+    if (videos.isEmpty) {
+      videos.add(_videoDatabase['default']!);
+    }
+    return videos;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final videosToShow = _getVideosToShow();
+    return Scaffold(
+      appBar: AppBar(title: const Text('맞춤형 예방 및 관리 가이드')),
+      body: ListView.builder(
+        padding: const EdgeInsets.all(16.0),
+        itemCount: videosToShow.length,
+        itemBuilder: (context, index) {
+          final videoInfo = videosToShow[index];
+          return VideoItemCard(
+            index: index + 1,
+            title: videoInfo['title']!,
+            description: videoInfo['desc']!,
+            assetPath: videoInfo['assetPath']!, // 🚀 에셋 경로 전달
+          );
+        },
+      ),
+    );
+  }
+}
+
+class VideoItemCard extends StatefulWidget {
+  final int index;
+  final String title;
+  final String description;
+  final String assetPath;
+
+  const VideoItemCard({
+    super.key,
+    required this.index,
+    required this.title,
+    required this.description,
+    required this.assetPath,
+  });
+
+  @override
+  State<VideoItemCard> createState() => _VideoItemCardState();
+}
+
+class _VideoItemCardState extends State<VideoItemCard> {
+  late VideoPlayerController _controller;
+  bool _isInitialized = false;
 
   @override
   void initState() {
     super.initState();
-    _loadVideoBasedOnResults();
-  }
-
-  // 🚀 AI 분석 결과(위젯이 업데이트 될 때)가 바뀌면 영상을 새로 세팅합니다.
-  @override
-  void didUpdateWidget(covariant VideoScreen oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.aiResults != oldWidget.aiResults) {
-      _loadVideoBasedOnResults();
-    }
-  }
-
-  // 🚀 핵심 로직: 질환에 맞는 영상을 찾아 로드합니다.
-  void _loadVideoBasedOnResults() {
-    String selectedDisease = 'default';
-
-    // 분석 결과가 있다면, 가장 먼저 탐지된 질환(또는 우선순위)의 영상을 선택합니다.
-    if (widget.aiResults.isNotEmpty) {
-      // 여기서는 심플하게 첫 번째로 탐지된 질환을 기준으로 합니다.
-      String firstDetected = widget.aiResults.first['disease'];
-      
-      if (_videoDatabase.containsKey(firstDetected)) {
-         selectedDisease = firstDetected;
-      }
-    }
-
-    final videoInfo = _videoDatabase[selectedDisease]!;
-    
-    // 기존 컨트롤러가 있다면 해제하고 새로 만듭니다.
-    _controller?.dispose();
-    
-    setState(() {
-      _isInitialized = false;
-      _videoTitle = videoInfo['title']!;
-      _videoDescription = videoInfo['desc']!;
-    });
-
-    _controller = VideoPlayerController.networkUrl(Uri.parse(videoInfo['url']!))
+    _controller = VideoPlayerController.asset(widget.assetPath)
       ..initialize().then((_) {
         setState(() {
           _isInitialized = true;
@@ -587,71 +604,68 @@ class _VideoScreenState extends State<VideoScreen> {
 
   @override
   void dispose() {
-    _controller?.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('맞춤형 예방 및 관리 가이드')),
-      body: Center(
-        child: _isInitialized && _controller != null
-            ? Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // 🚀 맞춤형 제목 표시
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                    child: Text(
-                      _videoTitle,
-                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.teal),
-                      textAlign: TextAlign.center,
+    return Card(
+      margin: const EdgeInsets.only(bottom: 24.0),
+      elevation: 3,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            color: Colors.teal,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Text(
+              '${widget.index}. ${widget.title}',
+              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+          ),
+          
+          _isInitialized
+              ? Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    AspectRatio(
+                      aspectRatio: _controller.value.aspectRatio,
+                      child: VideoPlayer(_controller),
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  
-                  // 영상 플레이어
-                  AspectRatio(
-                    aspectRatio: _controller!.value.aspectRatio,
-                    child: VideoPlayer(_controller!),
-                  ),
-                  const SizedBox(height: 20),
-                  
-                  // 재생 / 일시정지 버튼
-                  FloatingActionButton(
-                    onPressed: () {
-                      setState(() {
-                        _controller!.value.isPlaying
-                            ? _controller!.pause()
-                            : _controller!.play();
-                      });
-                    },
-                    backgroundColor: Colors.teal,
-                    child: Icon(
-                      _controller!.value.isPlaying ? Icons.pause : Icons.play_arrow,
-                      color: Colors.white,
+                    FloatingActionButton(
+                      heroTag: 'fab_${widget.index}',
+                      backgroundColor: Colors.teal.withOpacity(0.8),
+                      onPressed: () {
+                        setState(() {
+                          _controller.value.isPlaying
+                              ? _controller.pause()
+                              : _controller.play();
+                        });
+                      },
+                      child: Icon(
+                        _controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
+                        color: Colors.white,
+                        size: 30,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 20),
-                  
-                  // 🚀 맞춤형 설명 텍스트 표시
-                  Container(
-                    padding: const EdgeInsets.all(16.0),
-                    margin: const EdgeInsets.symmetric(horizontal: 20),
-                    decoration: BoxDecoration(
-                      color: Colors.teal.withOpacity(0.05),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      _videoDescription,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.black87, fontSize: 15, height: 1.5),
-                    ),
-                  )
-                ],
-              )
-            : const CircularProgressIndicator(color: Colors.teal),
+                  ],
+                )
+              : const SizedBox(
+                  height: 200,
+                  child: Center(child: CircularProgressIndicator(color: Colors.teal)),
+                ),
+
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text(
+              widget.description,
+              style: const TextStyle(fontSize: 15, color: Colors.black87),
+            ),
+          ),
+        ],
       ),
     );
   }
