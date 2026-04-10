@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:dio/dio.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart'; 
 import 'package:video_player/video_player.dart';
+import 'package:lottie/lottie.dart'; 
 
 void main() {
   runApp(const DentalApp());
@@ -240,11 +241,23 @@ class _VisionScreenState extends State<VisionScreen> {
                 decoration: BoxDecoration(color: Colors.teal.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
                 child: Column(
                   children: [
-                    if (_isLoading) const CircularProgressIndicator(),
-                    if (_isLoading) const SizedBox(height: 12),
-                    Text(_resultText, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.teal), textAlign: TextAlign.center),
-                  ],
-                ),
+                    if (_isLoading)
+                      SizedBox(
+                        width: 120,
+                        height: 120,
+                        child: Lottie.network(
+                          'https://lottie.host/842e128b-b6d1-4ba2-b25b-592b0c36b4bc/1rQe5N9iGz.json',
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    if (_isLoading) const SizedBox(height: 16),
+                      Text(
+                        _resultText, 
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.teal), 
+                        textAlign: TextAlign.center
+                      ),
+                    ],
+                  ),
               ),
               const SizedBox(height: 24),
               Row(
