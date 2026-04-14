@@ -140,6 +140,7 @@ class _VisionScreenState extends State<VisionScreen> {
     });
 
     try {
+      await Future.delayed(const Duration(milliseconds: 6000));
       var uri = Uri.parse('http://127.0.0.1:8000/api/predict');
       var request = http.MultipartRequest('POST', uri);
       request.files.add(http.MultipartFile.fromBytes(
@@ -245,8 +246,8 @@ class _VisionScreenState extends State<VisionScreen> {
                       SizedBox(
                         width: 120,
                         height: 120,
-                        child: Lottie.network(
-                          'https://lottie.host/842e128b-b6d1-4ba2-b25b-592b0c36b4bc/1rQe5N9iGz.json',
+                        child: Lottie.asset( 
+                          'assets/lottie/loading.json',
                           fit: BoxFit.cover,
                         ),
                       ),
